@@ -18,6 +18,11 @@
 
     <!-- Canvas Confetti for Win Animations -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
 
     <style>
         /* Custom CSS for elements not easily styled with Tailwind */
@@ -800,44 +805,80 @@
 
     <script>
     document.addEventListener('DOMContentLoaded', () => {
+        // --- IMPORTANT: PASTE YOUR FIREBASE CONFIGURATION HERE ---
+      const firebaseConfig = {
+  apiKey: "AIzaSyC9dyDhYaftUo7douOisc2l6VT_VHLhSU8",
+  authDomain: "spinearn-b67a8.firebaseapp.com",
+  databaseURL: "https://spinearn-b67a8-default-rtdb.firebaseio.com",
+  projectId: "spinearn-b67a8",
+  storageBucket: "spinearn-b67a8.firebasestorage.app",
+  messagingSenderId: "977580192365",
+  appId: "1:977580192365:web:853203eeb19952ea990564",
+  measurementId: "G-4Y2C9GVM2Z"
+};
+        
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
 
-        // --- AUTHENTICATION with PHP Backend ---
+        // --- AUTHENTICATION ---
         const Auth = {
-            async apiCall(action, data) {
+            currentUser: null,
+            
+            async login(email, password) {
                 try {
-                    const response = await fetch(`api.php?action=${action}`, {
-                        method: data ? 'POST' : 'GET',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: data ? JSON.stringify(data) : null
-                    });
-                    if (!response.ok) throw new Error('Network response was not ok');
-                    return await response.json();
+                    const userCredential = await auth.signInWithEmailAndPassword(email, password);
+                    this.currentUser = userCredential.user;
+                    return { success: true };
                 } catch (error) {
-                    console.error('API Call Error:', error);
                     return { success: false, error: error.message };
                 }
             },
             
-            async login(email, password) {
-                return this.apiCall('login', { email, password });
-            },
-            
             async signup(name, email, phone, password) {
-                return this.apiCall('signup', { name, email, phone, password });
+                try {
+                    const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                    const user = userCredential.user;
+                    
+                    // Create user profile in Firestore
+                    await db.collection('users').doc(user.uid).set({
+                        uid: user.uid,
+                        name,
+                        email,
+                        phone,
+                        coins: 1000,
+                        spinsLeft: 5,
+                        slotTokens: 10,
+                        scratchCards: 3,
+                        joinedDate: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long' }),
+                        totalWins: 0,
+                        totalSpins: 0,
+                        totalPayouts: 0,
+                        referralCode: 'WINZONE-' + Math.random().toString(36).slice(2, 9).toUpperCase()
+                    });
+                    
+                    this.currentUser = user;
+                    return { success: true };
+                } catch (error) {
+                    return { success: false, error: error.message };
+                }
             },
             
-            async logout() {
-                return this.apiCall('logout');
+            logout() {
+                return auth.signOut();
             },
             
-            async checkSession() {
-                return this.apiCall('check_session');
+            onAuthStateChanged(callback) {
+                return auth.onAuthStateChanged((user) => {
+                    this.currentUser = user;
+                    callback(user);
+                });
             }
         };
 
         // --- STATE MANAGEMENT ---
         const AppState = {
-            userId: null,
             username: 'Player',
             email: '',
             phone: '',
@@ -855,71 +896,99 @@
         };
 
         async function loadState() {
-            const response = await Auth.apiCall('get_user_data');
-            if (response.success) {
-                const { userData, activities, payouts } = response;
-                AppState.userId = userData.id;
-                AppState.username = userData.name;
-                AppState.email = userData.email;
-                AppState.phone = userData.phone;
-                AppState.coins = parseInt(userData.coins);
-                AppState.spinsLeft = parseInt(userData.spinsLeft);
-                AppState.slotTokens = parseInt(userData.slotTokens);
-                AppState.scratchCards = parseInt(userData.scratchCards);
-                AppState.totalWins = parseInt(userData.totalWins);
-                AppState.totalSpins = parseInt(userData.totalSpins);
-                AppState.totalPayouts = parseInt(userData.totalPayouts);
-                AppState.joinedDate = userData.joinedDate;
-                AppState.referralCode = userData.referralCode;
-
-                AppState.lastActivity = activities.map(act => ({ ...act, time: formatTimestamp(act.timestamp) }));
-                AppState.payoutHistory = payouts.map(payout => ({ ...payout, formattedTime: formatTimestamp(payout.timestamp) }));
+            if (Auth.currentUser) {
+                const userDoc = await db.collection('users').doc(Auth.currentUser.uid).get();
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    AppState.username = userData.name;
+                    AppState.email = userData.email;
+                    AppState.phone = userData.phone;
+                    AppState.coins = userData.coins;
+                    AppState.spinsLeft = userData.spinsLeft;
+                    AppState.slotTokens = userData.slotTokens;
+                    AppState.scratchCards = userData.scratchCards;
+                    AppState.totalWins = userData.totalWins || 0;
+                    AppState.totalSpins = userData.totalSpins || 0;
+                    AppState.totalPayouts = userData.totalPayouts || 0;
+                    AppState.joinedDate = userData.joinedDate || '';
+                    AppState.referralCode = userData.referralCode || '';
+                    document.getElementById('referral-code').value = AppState.referralCode;
+                }
                 
-                document.getElementById('referral-code').value = AppState.referralCode;
+                await loadActivities();
+                await loadPayoutHistory();
+                
                 updateUI();
                 renderActivityLog();
                 renderProfileActivity();
                 renderPayoutHistory();
-                return true;
             }
-            return false;
         }
-
 
         async function saveState() {
-            await Auth.apiCall('save_state', {
-                coins: AppState.coins,
-                spinsLeft: AppState.spinsLeft,
-                slotTokens: AppState.slotTokens,
-                scratchCards: AppState.scratchCards,
-                totalWins: AppState.totalWins,
-                totalSpins: AppState.totalSpins,
-                totalPayouts: AppState.totalPayouts
-            });
+            if (Auth.currentUser) {
+                await db.collection('users').doc(Auth.currentUser.uid).update({
+                    coins: AppState.coins,
+                    spinsLeft: AppState.spinsLeft,
+                    slotTokens: AppState.slotTokens,
+                    scratchCards: AppState.scratchCards,
+                    totalWins: AppState.totalWins,
+                    totalSpins: AppState.totalSpins,
+                    totalPayouts: AppState.totalPayouts
+                });
+            }
         }
 
-        function formatTimestamp(sqlTimestamp) {
-            if (!sqlTimestamp) return 'Just now';
-            
+        async function loadActivities() {
+            if (Auth.currentUser) {
+                const activitiesSnapshot = await db.collection('users').doc(Auth.currentUser.uid)
+                    .collection('activities').orderBy('timestamp', 'desc').limit(10).get();
+                
+                AppState.lastActivity = activitiesSnapshot.docs.map(doc => {
+                    const activity = doc.data();
+                    return {
+                        id: doc.id,
+                        ...activity,
+                        time: formatTimestamp(activity.timestamp)
+                    };
+                });
+            }
+        }
+
+        async function loadPayoutHistory() {
+            if (Auth.currentUser) {
+                const payoutsSnapshot = await db.collection('users').doc(Auth.currentUser.uid)
+                    .collection('payouts').orderBy('timestamp', 'desc').get();
+                
+                AppState.payoutHistory = payoutsSnapshot.docs.map(doc => {
+                    const payout = doc.data();
+                    return {
+                        id: doc.id,
+                        ...payout,
+                        formattedTime: formatTimestamp(payout.timestamp)
+                    };
+                });
+            }
+        }
+
+        function formatTimestamp(timestamp) {
+            if (!timestamp) return 'Just now';
+            const date = timestamp.toDate ? timestamp.toDate() : new Date();
             const now = new Date();
-            // Adjust for potential timezone differences if server and client are different
-            const date = new Date(sqlTimestamp.replace(' ', 'T') + 'Z'); 
             const diffInSeconds = Math.floor((now - date) / 1000);
             
             if (diffInSeconds < 60) return 'Just now';
             if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} min ago`;
             if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
-            if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`;
-            
             return date.toLocaleDateString();
         }
 
-        async function updateCoins(amount) {
+        async function updateCoins(amount, shouldSave = true) {
             AppState.coins += amount;
             if (amount > 0) {
                 AppState.totalWins++;
             }
-            await saveState();
+            if (shouldSave) await saveState();
             updateUI();
             if (amount > 0) {
                 document.getElementById('win-sound').play().catch(e => console.log("Audio play failed"));
@@ -927,11 +996,16 @@
         }
 
         async function addActivity(icon, color, text) {
-            await Auth.apiCall('add_activity', { icon, color, text });
-            AppState.lastActivity.unshift({ icon, color, text, time: 'Just now' });
-            if (AppState.lastActivity.length > 10) AppState.lastActivity.pop();
-            renderActivityLog();
-            renderProfileActivity();
+            if (Auth.currentUser) {
+                const activity = {
+                    icon, color, text,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                await db.collection('users').doc(Auth.currentUser.uid).collection('activities').add(activity);
+                await loadActivities(); // Reload to get the latest
+                renderActivityLog();
+                renderProfileActivity();
+            }
         }
 
         // --- UI UPDATES ---
@@ -948,16 +1022,17 @@
             document.getElementById('payout-balance').textContent = AppState.coins.toLocaleString();
             document.getElementById('request-payout-btn').disabled = AppState.coins < 1000;
             
-            // Update profile page
-            document.getElementById('profile-name').textContent = AppState.username;
-            document.getElementById('profile-id').textContent = `ID: #WIN${AppState.userId}`;
-            document.getElementById('profile-email').textContent = AppState.email;
-            document.getElementById('profile-phone').textContent = AppState.phone;
-            document.getElementById('profile-joined').textContent = AppState.joinedDate;
-            document.getElementById('total-coins').textContent = AppState.coins.toLocaleString();
-            document.getElementById('total-wins').textContent = AppState.totalWins;
-            document.getElementById('total-spins').textContent = AppState.totalSpins;
-            document.getElementById('total-payouts').textContent = AppState.totalPayouts;
+            if (Auth.currentUser) {
+                document.getElementById('profile-name').textContent = AppState.username;
+                document.getElementById('profile-id').textContent = `ID: #${Auth.currentUser.uid.substring(0, 8)}`;
+                document.getElementById('profile-email').textContent = AppState.email;
+                document.getElementById('profile-phone').textContent = AppState.phone;
+                document.getElementById('profile-joined').textContent = AppState.joinedDate;
+                document.getElementById('total-coins').textContent = AppState.coins.toLocaleString();
+                document.getElementById('total-wins').textContent = AppState.totalWins;
+                document.getElementById('total-spins').textContent = AppState.totalSpins;
+                document.getElementById('total-payouts').textContent = AppState.totalPayouts;
+            }
         }
 
         function renderActivityLog() {
@@ -996,30 +1071,17 @@
             
             historyContainer.innerHTML = AppState.payoutHistory.map(payout => {
                 let statusClass, statusText;
-                
                 switch(payout.status) {
-                    case 'pending':
-                        statusClass = 'status-pending';
-                        statusText = 'Pending';
-                        break;
-                    case 'approved':
-                        statusClass = 'status-approved';
-                        statusText = 'Approved';
-                        break;
-                    case 'rejected':
-                        statusClass = 'status-rejected';
-                        statusText = 'Rejected';
-                        break;
-                    default:
-                        statusClass = 'status-pending';
-                        statusText = 'Pending';
+                    case 'approved': statusClass = 'status-approved'; statusText = 'Approved'; break;
+                    case 'rejected': statusClass = 'status-rejected'; statusText = 'Rejected'; break;
+                    default: statusClass = 'status-pending'; statusText = 'Pending';
                 }
                 
                 return `
                     <div class="payout-request">
                         <div class="flex justify-between items-center">
                             <div>
-                                <p class="font-medium">${parseInt(payout.amount).toLocaleString()} coins <span class="text-sm text-gray-500">via ${payout.method || 'N/A'}</span></p>
+                                <p class="font-medium">${payout.amount.toLocaleString()} coins <span class="text-sm text-gray-500">via ${payout.method || 'N/A'}</span></p>
                                 <p class="text-sm text-gray-500">${payout.formattedTime}</p>
                             </div>
                             <span class="payout-status ${statusClass}">${statusText}</span>
@@ -1068,14 +1130,8 @@
             const password = document.getElementById('login-password').value;
             
             const result = await Auth.login(email, password);
-            
-            if (result.success) {
-                if (await loadState()) {
-                    document.getElementById('auth-overlay').classList.add('hidden');
-                    init();
-                }
-            } else {
-                showAuthError(document.getElementById('login-form'), result.error || 'Login failed!');
+            if (!result.success) {
+                showAuthError(document.getElementById('login-form'), result.error);
             }
         });
 
@@ -1086,26 +1142,14 @@
             const password = document.getElementById('signup-password').value;
             
             const result = await Auth.signup(name, email, phone, password);
-            
-            if (result.success) {
-                if (await loadState()) {
-                    document.getElementById('auth-overlay').classList.add('hidden');
-                    init();
-                }
-            } else {
-                showAuthError(document.getElementById('signup-form'), result.error || 'Signup failed!');
+            if (!result.success) {
+                showAuthError(document.getElementById('signup-form'), result.error);
             }
         });
 
         document.getElementById('logout-btn').addEventListener('click', async () => {
             await Auth.logout();
-            
-            // Show auth overlay
-            document.getElementById('auth-overlay').classList.remove('hidden');
-            
-            // Reset forms
-            document.getElementById('login-form').classList.remove('hidden');
-            document.getElementById('signup-form').classList.add('hidden');
+            // Reset forms and show login
             document.getElementById('login-email').value = '';
             document.getElementById('login-password').value = '';
             document.getElementById('signup-name').value = '';
@@ -1122,15 +1166,11 @@
         function showPage(pageId) {
             pages.forEach(page => page.classList.toggle('active', page.id === pageId));
             navItems.forEach(item => item.classList.toggle('active', item.dataset.page === pageId));
-            if (pageId === 'payout-page') renderPayoutHistory();
+            if (pageId === 'payout-page') loadPayoutHistory().then(renderPayoutHistory);
         }
 
-        navItems.forEach(item => {
-            item.addEventListener('click', () => showPage(item.dataset.page));
-        });
-        navLinkBtns.forEach(btn => {
-            btn.addEventListener('click', () => showPage(btn.dataset.page));
-        });
+        navItems.forEach(item => item.addEventListener('click', () => showPage(item.dataset.page)));
+        navLinkBtns.forEach(btn => btn.addEventListener('click', () => showPage(btn.dataset.page)));
 
         // --- GAME: SPIN WHEEL ---
         const wheel = document.getElementById('wheel');
@@ -1148,6 +1188,7 @@
         let currentRotation = 0;
 
         function createWheel() {
+            wheel.innerHTML = '';
             segments.forEach((segment, i) => {
                 const segEl = document.createElement('div');
                 segEl.className = 'segment';
@@ -1168,7 +1209,7 @@
             
             document.getElementById('spin-sound').play().catch(e => console.log("Audio play failed"));
 
-            const randomDegree = Math.floor(Math.random() * (3600 - 2000 + 1)) + 2000;
+            const randomDegree = Math.floor(Math.random() * 3600) + 3600;
             const targetRotation = currentRotation + randomDegree;
 
             const normalizedRotation = targetRotation % 360;
@@ -1183,7 +1224,6 @@
                 spinBtn.disabled = false;
                 
                 const prize = winningSegment.value;
-                
                 if (prize > 0) {
                     showModal('Congratulations!', `You won ${prize} coins!`);
                     await updateCoins(prize);
@@ -1212,26 +1252,21 @@
             updateUI();
             
             document.getElementById('slot-result').textContent = '';
+            const spinIntervals = reels.map((reel) => setInterval(() => { reel.textContent = emojis[Math.floor(Math.random() * emojis.length)]; }, 100));
 
-            const spinIntervals = reels.map((reel, i) => {
-                return setInterval(() => {
-                    reel.textContent = emojis[Math.floor(Math.random() * emojis.length)];
-                }, 100);
-            });
+            setTimeout(() => {
+                const finalResults = [];
+                reels.forEach((reel, i) => {
+                    setTimeout(() => {
+                        clearInterval(spinIntervals[i]);
+                        const finalEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+                        reel.textContent = finalEmoji;
+                        finalResults.push(finalEmoji);
 
-            const finalResults = [];
-            reels.forEach((reel, i) => {
-                setTimeout(() => {
-                    clearInterval(spinIntervals[i]);
-                    const finalEmoji = emojis[Math.floor(Math.random() * emojis.length)];
-                    reel.textContent = finalEmoji;
-                    finalResults.push(finalEmoji);
-
-                    if (i === reels.length - 1) {
-                        checkSlotWin(finalResults);
-                    }
-                }, 1000 + i * 500);
-            });
+                        if (i === reels.length - 1) checkSlotWin(finalResults);
+                    }, i * 500);
+                });
+            }, 1000);
         });
 
         async function checkSlotWin(results) {
@@ -1241,12 +1276,9 @@
             let message = 'Try Again!';
 
             if (results[0] === results[1] && results[1] === results[2]) {
-                prize = 100;
-                message = `Jackpot! You won ${prize} coins!`;
-                confetti();
+                prize = 100; message = `Jackpot! You won ${prize} coins!`; confetti();
             } else if (results[0] === results[1] || results[1] === results[2] || results[0] === results[2]) {
-                prize = 50;
-                message = `Nice! Two matches! You won ${prize} coins!`;
+                prize = 50; message = `Nice! Two matches! You won ${prize} coins!`;
             }
 
             document.getElementById('slot-result').textContent = message;
@@ -1319,7 +1351,7 @@
             if (transparent / (pixels.length / 4) > 0.7) {
                 cardScratched = true;
                 ctx.clearRect(0, 0, scratchCanvas.width, scratchCanvas.height);
-                const prize = parseInt(scratchPrizeEl.dataset.prize);
+                const prize = parseInt(scratchPrizeEl.dataset.prize, 10);
                 AppState.scratchCards--;
                 await updateCoins(prize);
                 await addActivity('fa-star', 'text-purple-500', `Won ${prize} coins from a scratch card`);
@@ -1355,11 +1387,7 @@
             }, 100);
         });
 
-        tapBtn.addEventListener('click', () => {
-            if (timeLeft > 0) {
-                tapCount++;
-            }
-        });
+        tapBtn.addEventListener('click', () => { if (timeLeft > 0) tapCount++; });
 
         async function endTapGame() {
             tapTimerEl.textContent = '0.0';
@@ -1374,7 +1402,6 @@
 
         // --- PAYOUT PAGE ---
         const copyBtn = document.getElementById('copy-referral-btn');
-        const referralCodeEl = document.getElementById('referral-code');
         const requestPayoutBtn = document.getElementById('request-payout-btn');
         const payoutModal = document.getElementById('payout-modal');
         const payoutMethodSelect = document.getElementById('payout-method');
@@ -1384,9 +1411,9 @@
         const payoutErrorEl = document.getElementById('payout-error');
         const payoutAmountInput = document.getElementById('payout-amount');
         const payoutModalBalance = document.getElementById('payout-modal-balance');
-
+        
         copyBtn.addEventListener('click', () => {
-            navigator.clipboard.writeText(referralCodeEl.value).then(() => {
+            navigator.clipboard.writeText(document.getElementById('referral-code').value).then(() => {
                 copyBtn.textContent = 'Copied!';
                 setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
             });
@@ -1396,12 +1423,11 @@
             if (AppState.coins >= 1000) {
                 payoutErrorEl.textContent = '';
                 payoutAmountInput.value = '';
-                payoutAmountInput.max = AppState.coins;
                 payoutModalBalance.textContent = AppState.coins.toLocaleString();
                 payoutModal.classList.remove('hidden');
             }
         });
-        
+
         cancelPayoutBtn.addEventListener('click', () => payoutModal.classList.add('hidden'));
 
         payoutMethodSelect.addEventListener('change', (e) => {
@@ -1416,17 +1442,11 @@
             let details = {}, isValid = true;
 
             // --- VALIDATION ---
-            if (isNaN(requestedAmount)) {
-                payoutErrorEl.textContent = 'Please enter a valid amount.';
-                return;
-            }
-            if (requestedAmount < 1000) {
-                payoutErrorEl.textContent = 'Minimum payout amount is 1,000 coins.';
-                return;
+            if (isNaN(requestedAmount) || requestedAmount < 1000) {
+                payoutErrorEl.textContent = 'Minimum payout is 1,000 coins.'; return;
             }
             if (requestedAmount > AppState.coins) {
-                payoutErrorEl.textContent = 'You cannot withdraw more than your balance.';
-                return;
+                payoutErrorEl.textContent = 'Insufficient balance.'; return;
             }
             
             if (method === 'upi') {
@@ -1443,33 +1463,51 @@
             }
 
             if (!isValid) {
-                payoutErrorEl.textContent = 'Please fill in all required payment details.';
-                return;
+                payoutErrorEl.textContent = 'Please fill in all payment details.'; return;
             }
-
+            
             submitPayoutBtn.disabled = true;
             submitPayoutBtn.textContent = 'Submitting...';
-            
-            const result = await Auth.apiCall('request_payout', {
-                amount: requestedAmount,
-                method: method.charAt(0).toUpperCase() + method.slice(1),
-                details
-            });
 
-            if(result.success) {
-                AppState.coins -= requestedAmount; // Subtract from local state
-                AppState.totalPayouts++;
-                updateUI();
+            try {
+                // Use a Firestore transaction for safety
+                const userRef = db.collection('users').doc(Auth.currentUser.uid);
+                await db.runTransaction(async (transaction) => {
+                    const userDoc = await transaction.get(userRef);
+                    if (!userDoc.exists) throw "User not found!";
+                    
+                    const currentCoins = userDoc.data().coins;
+                    if (requestedAmount > currentCoins) throw "Insufficient balance!";
+
+                    const newCoins = currentCoins - requestedAmount;
+                    transaction.update(userRef, { 
+                        coins: newCoins,
+                        totalPayouts: firebase.firestore.FieldValue.increment(1)
+                    });
+
+                    const payoutRef = userRef.collection('payouts').doc();
+                    transaction.set(payoutRef, {
+                        amount: requestedAmount,
+                        status: 'pending',
+                        method: method.charAt(0).toUpperCase() + method.slice(1),
+                        details,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                });
+                
                 await addActivity('fa-money-bill-wave', 'text-green-500', `Requested payout of ${requestedAmount.toLocaleString()} coins`);
-                await loadState(); // Reload all data from server to be sure
+                await loadState(); // Reload state from Firestore
+                
                 payoutModal.classList.add('hidden');
                 showModal('Payout Requested', 'Your request has been received and will be processed soon.');
-            } else {
-                 payoutErrorEl.textContent = result.error || 'An error occurred. Please try again.';
-            }
 
-            submitPayoutBtn.disabled = false;
-            submitPayoutBtn.textContent = 'Submit Request';
+            } catch (error) {
+                console.error("Payout failed: ", error);
+                payoutErrorEl.textContent = typeof error === 'string' ? error : 'An error occurred. Please try again.';
+            } finally {
+                submitPayoutBtn.disabled = false;
+                submitPayoutBtn.textContent = 'Submit Request';
+            }
         });
 
         // --- INITIALIZATION ---
@@ -1481,19 +1519,18 @@
         }
 
         // Check authentication on load
-        async function startApp() {
-            const session = await Auth.checkSession();
-            if (session.isLoggedIn) {
-                if (await loadState()) {
-                    document.getElementById('auth-overlay').classList.add('hidden');
-                    init();
-                }
+        Auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                await loadState();
+                document.getElementById('auth-overlay').classList.add('hidden');
+                init();
             } else {
                 document.getElementById('auth-overlay').classList.remove('hidden');
+                // Reset state if logged out
+                Object.assign(AppState, { username: 'Player', coins: 0, spinsLeft: 0, slotTokens: 0, scratchCards: 0 });
+                updateUI();
             }
-        }
-        
-        startApp();
+        });
     });
     </script>
 </body>
