@@ -1,0 +1,1500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WinZone - Spin & Earn</title>
+
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts: Poppins -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Canvas Confetti for Win Animations -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+
+    <style>
+        /* Custom CSS for elements not easily styled with Tailwind */
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+
+        .page {
+            display: none;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        .nav-item.active {
+            color: #667eea;
+            border-top: 3px solid #667eea;
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        /* Spin Wheel Styles */
+        #wheel-container {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            margin: 2rem auto;
+        }
+        #wheel {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            position: relative;
+            overflow: hidden;
+            border: 8px solid #fff;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            transition: transform 5s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+        .segment {
+            position: absolute;
+            width: 50%;
+            height: 50%;
+            transform-origin: 100% 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            font-size: 1.2rem;
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+        }
+        #wheel-pointer {
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-top: 30px solid #e74c3c;
+            z-index: 10;
+            filter: drop-shadow(0 3px 3px rgba(0,0,0,0.3));
+        }
+
+        /* Scratch Card Styles */
+        #scratch-card-container {
+            position: relative;
+            width: 300px;
+            height: 150px;
+            cursor: crosshair;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+        #scratch-prize {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.5rem; font-weight: bold; color: #667eea;
+            background: linear-gradient(45deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+        #scratch-canvas {
+            position: absolute;
+            top: 0; left: 0;
+        }
+
+        /* Slot Machine Styles */
+        .slot-reel {
+            font-size: 3rem;
+            width: 80px;
+            height: 100px;
+            background: rgba(255,255,255,0.7);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease;
+        }
+        .slot-reel:hover {
+            transform: translateY(-5px);
+        }
+
+        /* Enhanced button styles */
+        .btn-primary {
+            background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: 600;
+            padding: 0.75rem 1.5rem;
+            border-radius: 50px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+        .btn-primary:disabled {
+            background: #e0e0e0;
+            color: #a0a0a0;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+        .btn-secondary {
+             background-color: #f3f4f6;
+             color: #4b5563;
+             font-weight: 600;
+             padding: 0.75rem 1.5rem;
+             border-radius: 50px;
+             border: 1px solid #d1d5db;
+             transition: all 0.3s ease;
+        }
+        .btn-secondary:hover {
+            background-color: #e5e7eb;
+        }
+
+
+        /* Card hover effects */
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+
+        /* Loading animation */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Improved modal */
+        .modal-backdrop {
+            backdrop-filter: blur(5px);
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        .modal-content {
+            animation: modalFadeIn 0.3s ease;
+        }
+        @keyframes modalFadeIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        /* Activity item hover */
+        .activity-item {
+            transition: all 0.2s ease;
+        }
+        .activity-item:hover {
+            background-color: #f5f5f5;
+            transform: translateX(5px);
+        }
+
+        /* Navigation animation */
+        .nav-item {
+            transition: all 0.2s ease;
+        }
+        .nav-item:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        .nav-item i {
+            transition: transform 0.2s ease;
+        }
+        .nav-item:hover i {
+            transform: translateY(-3px);
+        }
+
+        /* Stats card animation */
+        .stat-card {
+            transition: all 0.3s ease;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .stat-card:hover .stat-icon {
+            transform: scale(1.1);
+        }
+        .stat-icon {
+            transition: transform 0.3s ease;
+        }
+
+        /* Tap button animation */
+        #tap-btn:active {
+            animation: tapPulse 0.3s ease;
+        }
+        @keyframes tapPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(0.95); }
+            100% { transform: scale(1); }
+        }
+
+        /* Improved header */
+        header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+        }
+
+        /* Container styling */
+        .app-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+
+        /* Bottom navigation */
+        nav {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+        }
+
+        /* Login/Signup styles */
+        .auth-overlay {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            z-index: 50;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+        .auth-overlay.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+        .auth-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            animation: slideUp 0.5s ease;
+        }
+        @keyframes slideUp {
+            from { transform: translateY(50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        /* Profile avatar */
+        .profile-avatar {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 4px solid #667eea;
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        /* Achievement badge */
+        .achievement-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin: 0.25rem;
+        }
+
+        /* Payout request styles */
+        .payout-request {
+            background: white;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+        }
+        .payout-request:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        .payout-status {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .status-pending {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+        .status-approved {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+        .status-rejected {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+
+        /* Custom Input for Payout Modal */
+        .form-input {
+             width: 100%;
+             padding: 0.5rem 1rem;
+             border: 1px solid #d1d5db;
+             border-radius: 8px;
+             transition: all 0.2s ease;
+        }
+        .form-input:focus {
+             outline: none;
+             border-color: #667eea;
+             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }
+        .form-label {
+             display: block;
+             margin-bottom: 0.25rem;
+             font-size: 0.875rem;
+             font-weight: 500;
+             color: #374151;
+        }
+    </style>
+</head>
+<body>
+    <!-- Login/Signup Overlay -->
+    <div id="auth-overlay" class="auth-overlay">
+        <div class="auth-card w-full max-w-md p-8 rounded-2xl">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-indigo-600 mb-2">WinZone</h1>
+                <p class="text-gray-600">Spin & Earn Your Fortune</p>
+            </div>
+
+            <!-- Login Form -->
+            <div id="login-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input type="email" id="login-email" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" placeholder="Enter your email">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <input type="password" id="login-password" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" placeholder="Enter your password">
+                </div>
+                <button id="login-btn" class="w-full btn-primary text-lg">Login</button>
+                <p class="text-center text-gray-600">
+                    Don't have an account? 
+                    <a href="#" id="show-signup" class="text-purple-600 hover:text-purple-800 font-semibold">Sign Up</a>
+                </p>
+            </div>
+
+            <!-- Signup Form -->
+            <div id="signup-form" class="space-y-4 hidden">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                    <input type="text" id="signup-name" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" placeholder="Enter your name">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input type="email" id="signup-email" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" placeholder="Enter your email">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                    <input type="tel" id="signup-phone" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" placeholder="Enter your phone">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <input type="password" id="signup-password" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" placeholder="Create a password">
+                </div>
+                <button id="signup-btn" class="w-full btn-primary text-lg">Sign Up</button>
+                <p class="text-center text-gray-600">
+                    Already have an account? 
+                    <a href="#" id="show-login" class="text-purple-600 hover:text-purple-800 font-semibold">Login</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div class="container mx-auto max-w-lg min-h-screen app-container flex flex-col">
+        <!-- Top Bar -->
+        <header class="shadow-md p-4 flex justify-between items-center sticky top-0 z-20">
+            <h1 class="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-indigo-600">WinZone</h1>
+            <div class="flex items-center space-x-2 bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-800 font-bold px-4 py-2 rounded-full">
+                <i class="fas fa-coins"></i>
+                <span id="coin-balance-top">0</span>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main id="app-content" class="flex-grow p-4 pb-24 overflow-y-auto">
+
+            <!-- Dashboard Page -->
+            <section id="dashboard-page" class="page active">
+                <div class="welcome-section mb-6 text-center">
+                    <h2 class="text-2xl font-semibold">Welcome Back, <span id="username">Player</span>!</h2>
+                    <p class="text-gray-500">Ready to test your luck?</p>
+                </div>
+
+                <div class="stats-panel grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div class="stat-card bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-lg shadow text-center card-hover">
+                        <div class="stat-icon text-2xl text-yellow-500 mb-2"><i class="fas fa-coins"></i></div>
+                        <p class="text-sm text-gray-600">Balance</p>
+                        <p id="stat-balance" class="font-bold text-lg">0 pts</p>
+                    </div>
+                    <div class="stat-card bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg shadow text-center card-hover">
+                        <div class="stat-icon text-2xl text-blue-500 mb-2"><i class="fas fa-sync-alt"></i></div>
+                        <p class="text-sm text-gray-600">Spins Left</p>
+                        <p id="stat-spins" class="font-bold text-lg">0</p>
+                    </div>
+                    <div class="stat-card bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg shadow text-center card-hover">
+                        <div class="stat-icon text-2xl text-green-500 mb-2"><i class="fas fa-ticket-alt"></i></div>
+                        <p class="text-sm text-gray-600">Slot Tokens</p>
+                        <p id="stat-slots" class="font-bold text-lg">0</p>
+                    </div>
+                    <div class="stat-card bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg shadow text-center card-hover">
+                        <div class="stat-icon text-2xl text-purple-500 mb-2"><i class="fas fa-star"></i></div>
+                        <p class="text-sm text-gray-600">Scratch Cards</p>
+                        <p id="stat-scratch" class="font-bold text-lg">0</p>
+                    </div>
+                </div>
+
+                <div class="spin-action-card bg-gradient-to-r from-purple-500 to-indigo-600 text-white p-6 rounded-lg shadow-lg mb-6 text-center card-hover">
+                    <h3 class="text-xl font-bold mb-2">The Wheel of Fortune Awaits!</h3>
+                    <p class="mb-4">Use your daily spins to win amazing prizes.</p>
+                    <button data-page="spin-page" class="nav-link-btn bg-white text-purple-600 font-bold py-2 px-6 rounded-full shadow-md hover:bg-gray-100 transition">Go to Spin Wheel</button>
+                </div>
+
+                <div class="feature-grid grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div class="feature-card bg-white p-4 rounded-lg shadow flex items-center space-x-4 card-hover">
+                        <div class="text-2xl bg-green-100 text-green-600 p-3 rounded-md"><i class="fas fa-calendar-check"></i></div>
+                        <div>
+                            <h4 class="font-bold">Daily Bonus</h4>
+                            <p class="text-sm text-gray-500">Claim your daily reward!</p>
+                        </div>
+                    </div>
+                     <div class="feature-card bg-white p-4 rounded-lg shadow flex items-center space-x-4 card-hover">
+                        <div class="text-2xl bg-blue-100 text-blue-600 p-3 rounded-md"><i class="fas fa-users"></i></div>
+                        <div>
+                            <h4 class="font-bold">Refer a Friend</h4>
+                            <p class="text-sm text-gray-500">Earn more with friends.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="activity-log">
+                    <h3 class="text-xl font-semibold mb-4">Recent Activity</h3>
+                    <div id="activity-list" class="space-y-3">
+                        <!-- Activity items will be injected here by JS -->
+                    </div>
+                    <a href="#" class="text-purple-600 font-semibold mt-4 inline-block hover:text-purple-800 transition">View All Activity</a>
+                </div>
+            </section>
+
+            <!-- Spin Page -->
+            <section id="spin-page" class="page text-center">
+                <h2 class="text-3xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-indigo-600">Spin the Wheel</h2>
+                <p class="text-gray-600 mb-2">You have <span id="spin-count" class="font-bold text-purple-600">0</span> spins left today.</p>
+                <div id="wheel-container">
+                    <div id="wheel"></div>
+                    <div id="wheel-pointer"></div>
+                </div>
+                <button id="spin-btn" class="btn-primary mt-6 text-xl">Spin Now</button>
+            </section>
+
+            <!-- Slot Page -->
+            <section id="slot-page" class="page text-center">
+                <h2 class="text-3xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-green-500 to-teal-600">Slot Machine</h2>
+                <p class="text-gray-600 mb-4">Tokens: <span id="slot-token-count" class="font-bold text-green-600">0</span></p>
+                <div class="flex justify-center space-x-4 mb-6">
+                    <div class="slot-reel" id="reel1">❓</div>
+                    <div class="slot-reel" id="reel2">❓</div>
+                    <div class="slot-reel" id="reel3">❓</div>
+                </div>
+                <button id="spin-slots-btn" class="btn-primary text-xl">Spin Slots</button>
+                <p id="slot-result" class="mt-4 font-semibold text-lg"></p>
+            </section>
+
+            <!-- Scratch Page -->
+            <section id="scratch-page" class="page text-center">
+                <h2 class="text-3xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-yellow-500 to-orange-600">Scratch & Win</h2>
+                <p class="text-gray-600 mb-4">Cards left: <span id="scratch-card-count" class="font-bold text-yellow-600">0</span></p>
+                <div id="scratch-card-container" class="mx-auto rounded-lg shadow-inner">
+                    <div id="scratch-prize">You won 50 coins!</div>
+                    <canvas id="scratch-canvas" width="300" height="150"></canvas>
+                </div>
+                <button id="new-scratch-card-btn" class="mt-4 btn-primary">New Card</button>
+            </section>
+
+            <!-- Tap & Win Page -->
+            <section id="tap-page" class="page text-center">
+                <h2 class="text-3xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-cyan-600">Tap & Win</h2>
+                <p class="text-gray-600 mb-4">Tap as fast as you can in 5 seconds!</p>
+                <div id="tap-timer" class="text-5xl font-bold text-blue-500 mb-4">5.0</div>
+                <button id="tap-btn" class="w-48 h-48 bg-gradient-to-r from-blue-500 to-cyan-600 text-white rounded-full text-2xl font-bold shadow-lg flex items-center justify-center disabled:bg-gray-400">Tap Me!</button>
+                <button id="start-tap-game-btn" class="mt-6 btn-primary text-xl">Start Game</button>
+                <p id="tap-result" class="mt-4 font-semibold text-lg"></p>
+            </section>
+
+            <!-- Profile Page -->
+            <section id="profile-page" class="page">
+                <div class="text-center mb-6">
+                    <div class="relative inline-block">
+                        <img id="profile-avatar" src="https://picsum.photos/seed/user123/120/120.jpg" alt="Profile" class="profile-avatar mx-auto mb-4">
+                        <button class="absolute bottom-4 right-0 bg-purple-600 text-white p-2 rounded-full shadow-lg hover:bg-purple-700 transition">
+                            <i class="fas fa-camera text-sm"></i>
+                        </button>
+                    </div>
+                    <h2 id="profile-name" class="text-2xl font-bold mb-1">Player</h2>
+                    <p id="profile-id" class="text-gray-500 text-sm">ID: #</p>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-6 mb-4">
+                    <h3 class="font-bold text-lg mb-4 flex items-center">
+                        <i class="fas fa-user-circle mr-2 text-purple-600"></i>
+                        Personal Information
+                    </h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center py-2 border-b">
+                            <span class="text-gray-600">Email</span>
+                            <span id="profile-email" class="font-medium"></span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 border-b">
+                            <span class="text-gray-600">Phone</span>
+                            <span id="profile-phone" class="font-medium"></span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 border-b">
+                            <span class="text-gray-600">Member Since</span>
+                            <span id="profile-joined" class="font-medium"></span>
+                        </div>
+                        <div class="flex justify-between items-center py-2">
+                            <span class="text-gray-600">Status</span>
+                            <span class="achievement-badge bg-green-100 text-green-800">Active</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-6 mb-4">
+                    <h3 class="font-bold text-lg mb-4 flex items-center">
+                        <i class="fas fa-trophy mr-2 text-yellow-500"></i>
+                        Achievements
+                    </h3>
+                    <div class="flex flex-wrap gap-2">
+                        <span class="achievement-badge bg-yellow-100 text-yellow-800">
+                            <i class="fas fa-star mr-1"></i>Beginner
+                        </span>
+                        <span class="achievement-badge bg-blue-100 text-blue-800">
+                            <i class="fas fa-dice mr-1"></i>Lucky Player
+                        </span>
+                        <span class="achievement-badge bg-purple-100 text-purple-800">
+                            <i class="fas fa-coins mr-1"></i>Collector
+                        </span>
+                        <span class="achievement-badge bg-green-100 text-green-800">
+                            <i class="fas fa-fire mr-1"></i>On Fire
+                        </span>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-6 mb-4">
+                    <h3 class="font-bold text-lg mb-4 flex items-center">
+                        <i class="fas fa-chart-line mr-2 text-green-600"></i>
+                        Statistics
+                    </h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="text-center p-3 bg-gray-50 rounded-lg">
+                            <div class="text-2xl font-bold text-purple-600" id="total-coins">0</div>
+                            <div class="text-sm text-gray-600">Total Coins</div>
+                        </div>
+                        <div class="text-center p-3 bg-gray-50 rounded-lg">
+                            <div class="text-2xl font-bold text-green-600" id="total-wins">0</div>
+                            <div class="text-sm text-gray-600">Total Wins</div>
+                        </div>
+                        <div class="text-center p-3 bg-gray-50 rounded-lg">
+                            <div class="text-2xl font-bold text-blue-600" id="total-spins">0</div>
+                            <div class="text-sm text-gray-600">Total Spins</div>
+                        </div>
+                        <div class="text-center p-3 bg-gray-50 rounded-lg">
+                            <div class="text-2xl font-bold text-orange-600" id="total-payouts">0</div>
+                            <div class="text-sm text-gray-600">Payouts</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-6 mb-4">
+                    <h3 class="font-bold text-lg mb-4 flex items-center">
+                        <i class="fas fa-history mr-2 text-indigo-600"></i>
+                        Recent Activity
+                    </h3>
+                    <div id="profile-activity-list" class="space-y-2 max-h-48 overflow-y-auto">
+                        <!-- Activity items will be injected here -->
+                    </div>
+                </div>
+
+                <button id="logout-btn" class="w-full bg-red-500 text-white font-bold py-3 rounded-lg shadow-lg hover:bg-red-600 transition">
+                    <i class="fas fa-sign-out-alt mr-2"></i>Logout
+                </button>
+            </section>
+
+            <!-- Payout Page -->
+            <section id="payout-page" class="page">
+                <h2 class="text-3xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-green-500 to-teal-600">Refer & Payout</h2>
+                <div class="bg-white p-6 rounded-lg shadow mb-6 card-hover">
+                    <h3 class="font-bold text-lg mb-2">Refer a Friend</h3>
+                    <p class="text-gray-600 mb-4">Share your code and earn 100 coins for every friend who joins!</p>
+                    <div class="flex items-center bg-gray-100 p-2 rounded-lg">
+                        <input id="referral-code" type="text" value="" readonly class="flex-grow bg-transparent outline-none font-mono">
+                        <button id="copy-referral-btn" class="bg-green-500 text-white font-bold py-1 px-3 rounded-md hover:bg-green-600 transition">Copy</button>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow mb-6 card-hover">
+                    <h3 class="font-bold text-lg mb-2">Request Payout</h3>
+                    <p class="text-gray-600 mb-4">You need at least 1,000 coins to request a payout.</p>
+                    <div class="text-2xl font-bold mb-4">Your Balance: <span id="payout-balance">0</span> coins</div>
+                    <button id="request-payout-btn" class="w-full btn-primary disabled:bg-gray-400 disabled:cursor-not-allowed">Request Payout</button>
+                </div>
+                
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <h3 class="font-bold text-lg mb-4 flex items-center">
+                        <i class="fas fa-money-check-alt mr-2 text-green-600"></i>
+                        Payout History
+                    </h3>
+                    <div id="payout-history" class="space-y-2">
+                        <!-- Payout requests will be injected here -->
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- Bottom Navigation -->
+        <nav class="fixed bottom-0 left-0 right-0 max-w-lg mx-auto border-t flex justify-around">
+            <button data-page="dashboard-page" class="nav-item active flex-1 text-center py-3 text-gray-500 transition">
+                <i class="fas fa-home text-xl"></i>
+                <span class="text-xs block">Home</span>
+            </button>
+            <button data-page="spin-page" class="nav-item flex-1 text-center py-3 text-gray-500 transition">
+                <i class="fas fa-dharmachakra text-xl"></i>
+                <span class="text-xs block">Spin</span>
+            </button>
+            <button data-page="slot-page" class="nav-item flex-1 text-center py-3 text-gray-500 transition">
+                <i class="fas fa-dice-three text-xl"></i>
+                <span class="text-xs block">Slots</span>
+            </button>
+            <button data-page="scratch-page" class="nav-item flex-1 text-center py-3 text-gray-500 transition">
+                <i class="fas fa-star text-xl"></i>
+                <span class="text-xs block">Scratch</span>
+            </button>
+            <button data-page="tap-page" class="nav-item flex-1 text-center py-3 text-gray-500 transition">
+                <i class="fas fa-hand-pointer text-xl"></i>
+                <span class="text-xs block">Tap</span>
+            </button>
+            <button data-page="profile-page" class="nav-item flex-1 text-center py-3 text-gray-500 transition">
+                <i class="fas fa-user text-xl"></i>
+                <span class="text-xs block">Profile</span>
+            </button>
+            <button data-page="payout-page" class="nav-item flex-1 text-center py-3 text-gray-500 transition">
+                <i class="fas fa-money-bill-wave text-xl"></i>
+                <span class="text-xs block">Payout</span>
+            </button>
+        </nav>
+
+        <!-- Modal for results -->
+        <div id="result-modal" class="fixed inset-0 modal-backdrop flex items-center justify-center z-30 hidden">
+            <div class="modal-content bg-white p-8 rounded-lg shadow-2xl text-center max-w-sm mx-4">
+                <div class="mb-4">
+                    <i class="fas fa-trophy text-5xl text-yellow-500"></i>
+                </div>
+                <h3 id="modal-title" class="text-2xl font-bold mb-4">Congratulations!</h3>
+                <p id="modal-body" class="text-lg mb-6">You won 50 points!</p>
+                <button id="modal-close-btn" class="btn-primary">Awesome!</button>
+            </div>
+        </div>
+
+        <!-- Payout Request Modal -->
+        <div id="payout-modal" class="fixed inset-0 modal-backdrop flex items-center justify-center z-40 hidden">
+            <div class="modal-content bg-white p-6 rounded-lg shadow-2xl w-full max-w-md mx-4">
+                <h3 class="text-xl font-bold mb-4 text-center">Request Payout</h3>
+
+                <div class="mb-4">
+                    <label for="payout-amount" class="form-label">Amount to Withdraw (Min: 1,000)</label>
+                    <input type="number" id="payout-amount" class="form-input" placeholder="Enter amount">
+                    <p class="text-xs text-gray-500 mt-1">Your balance: <span id="payout-modal-balance">0</span> coins</p>
+                </div>
+                
+                <div class="mb-4">
+                    <label for="payout-method" class="form-label">Payment Method</label>
+                    <select id="payout-method" class="form-input">
+                        <option value="upi">UPI</option>
+                        <option value="phonepe">PhonePe</option>
+                        <option value="bank">Bank Transfer</option>
+                    </select>
+                </div>
+
+                <!-- UPI Details -->
+                <div id="payout-details-upi" class="payout-details-form space-y-2">
+                    <div>
+                        <label for="upi-id" class="form-label">UPI ID</label>
+                        <input type="text" id="upi-id" class="form-input" placeholder="yourname@bank">
+                    </div>
+                </div>
+
+                <!-- PhonePe Details -->
+                <div id="payout-details-phonepe" class="payout-details-form space-y-2 hidden">
+                    <div>
+                        <label for="phonepe-number" class="form-label">PhonePe Number</label>
+                        <input type="tel" id="phonepe-number" class="form-input" placeholder="9876543210">
+                    </div>
+                </div>
+
+                <!-- Bank Transfer Details -->
+                <div id="payout-details-bank" class="payout-details-form space-y-2 hidden">
+                    <div>
+                        <label for="bank-account-name" class="form-label">Account Holder Name</label>
+                        <input type="text" id="bank-account-name" class="form-input" placeholder="John Doe">
+                    </div>
+                    <div>
+                        <label for="bank-account-number" class="form-label">Account Number</label>
+                        <input type="text" id="bank-account-number" class="form-input" placeholder="1234567890">
+                    </div>
+                    <div>
+                        <label for="bank-ifsc" class="form-label">IFSC Code</label>
+                        <input type="text" id="bank-ifsc" class="form-input" placeholder="BANK0001234">
+                    </div>
+                </div>
+                
+                <p id="payout-error" class="text-red-500 text-sm mt-2 text-center h-4"></p>
+                
+                <div class="flex justify-end items-center mt-6 space-x-3">
+                    <button id="cancel-payout-btn" class="btn-secondary">Cancel</button>
+                    <button id="submit-payout-btn" class="btn-primary">Submit Request</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Sound Effects -->
+    <audio id="win-sound" src="https://cdn.pixabay.com/download/audio/2022/03/10/audio_c3b092e343.mp3?filename=level-win-6416.mp3"></audio>
+    <audio id="spin-sound" src="https://cdn.pixabay.com/download/audio/2022/04/21/audio_a6a004a292.mp3?filename=spin-wheel-fast-80109.mp3"></audio>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+
+        // --- AUTHENTICATION with PHP Backend ---
+        const Auth = {
+            async apiCall(action, data) {
+                try {
+                    const response = await fetch(`api.php?action=${action}`, {
+                        method: data ? 'POST' : 'GET',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: data ? JSON.stringify(data) : null
+                    });
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    return await response.json();
+                } catch (error) {
+                    console.error('API Call Error:', error);
+                    return { success: false, error: error.message };
+                }
+            },
+            
+            async login(email, password) {
+                return this.apiCall('login', { email, password });
+            },
+            
+            async signup(name, email, phone, password) {
+                return this.apiCall('signup', { name, email, phone, password });
+            },
+            
+            async logout() {
+                return this.apiCall('logout');
+            },
+            
+            async checkSession() {
+                return this.apiCall('check_session');
+            }
+        };
+
+        // --- STATE MANAGEMENT ---
+        const AppState = {
+            userId: null,
+            username: 'Player',
+            email: '',
+            phone: '',
+            coins: 0,
+            spinsLeft: 0,
+            slotTokens: 0,
+            scratchCards: 0,
+            totalWins: 0,
+            totalSpins: 0,
+            totalPayouts: 0,
+            joinedDate: '',
+            referralCode: '',
+            lastActivity: [],
+            payoutHistory: []
+        };
+
+        async function loadState() {
+            const response = await Auth.apiCall('get_user_data');
+            if (response.success) {
+                const { userData, activities, payouts } = response;
+                AppState.userId = userData.id;
+                AppState.username = userData.name;
+                AppState.email = userData.email;
+                AppState.phone = userData.phone;
+                AppState.coins = parseInt(userData.coins);
+                AppState.spinsLeft = parseInt(userData.spinsLeft);
+                AppState.slotTokens = parseInt(userData.slotTokens);
+                AppState.scratchCards = parseInt(userData.scratchCards);
+                AppState.totalWins = parseInt(userData.totalWins);
+                AppState.totalSpins = parseInt(userData.totalSpins);
+                AppState.totalPayouts = parseInt(userData.totalPayouts);
+                AppState.joinedDate = userData.joinedDate;
+                AppState.referralCode = userData.referralCode;
+
+                AppState.lastActivity = activities.map(act => ({ ...act, time: formatTimestamp(act.timestamp) }));
+                AppState.payoutHistory = payouts.map(payout => ({ ...payout, formattedTime: formatTimestamp(payout.timestamp) }));
+                
+                document.getElementById('referral-code').value = AppState.referralCode;
+                updateUI();
+                renderActivityLog();
+                renderProfileActivity();
+                renderPayoutHistory();
+                return true;
+            }
+            return false;
+        }
+
+
+        async function saveState() {
+            await Auth.apiCall('save_state', {
+                coins: AppState.coins,
+                spinsLeft: AppState.spinsLeft,
+                slotTokens: AppState.slotTokens,
+                scratchCards: AppState.scratchCards,
+                totalWins: AppState.totalWins,
+                totalSpins: AppState.totalSpins,
+                totalPayouts: AppState.totalPayouts
+            });
+        }
+
+        function formatTimestamp(sqlTimestamp) {
+            if (!sqlTimestamp) return 'Just now';
+            
+            const now = new Date();
+            // Adjust for potential timezone differences if server and client are different
+            const date = new Date(sqlTimestamp.replace(' ', 'T') + 'Z'); 
+            const diffInSeconds = Math.floor((now - date) / 1000);
+            
+            if (diffInSeconds < 60) return 'Just now';
+            if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} min ago`;
+            if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
+            if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`;
+            
+            return date.toLocaleDateString();
+        }
+
+        async function updateCoins(amount) {
+            AppState.coins += amount;
+            if (amount > 0) {
+                AppState.totalWins++;
+            }
+            await saveState();
+            updateUI();
+            if (amount > 0) {
+                document.getElementById('win-sound').play().catch(e => console.log("Audio play failed"));
+            }
+        }
+
+        async function addActivity(icon, color, text) {
+            await Auth.apiCall('add_activity', { icon, color, text });
+            AppState.lastActivity.unshift({ icon, color, text, time: 'Just now' });
+            if (AppState.lastActivity.length > 10) AppState.lastActivity.pop();
+            renderActivityLog();
+            renderProfileActivity();
+        }
+
+        // --- UI UPDATES ---
+        function updateUI() {
+            document.getElementById('coin-balance-top').textContent = AppState.coins.toLocaleString();
+            document.getElementById('username').textContent = AppState.username;
+            document.getElementById('stat-balance').textContent = `${AppState.coins.toLocaleString()} pts`;
+            document.getElementById('stat-spins').textContent = AppState.spinsLeft;
+            document.getElementById('stat-slots').textContent = AppState.slotTokens;
+            document.getElementById('stat-scratch').textContent = AppState.scratchCards;
+            document.getElementById('spin-count').textContent = AppState.spinsLeft;
+            document.getElementById('slot-token-count').textContent = AppState.slotTokens;
+            document.getElementById('scratch-card-count').textContent = AppState.scratchCards;
+            document.getElementById('payout-balance').textContent = AppState.coins.toLocaleString();
+            document.getElementById('request-payout-btn').disabled = AppState.coins < 1000;
+            
+            // Update profile page
+            document.getElementById('profile-name').textContent = AppState.username;
+            document.getElementById('profile-id').textContent = `ID: #WIN${AppState.userId}`;
+            document.getElementById('profile-email').textContent = AppState.email;
+            document.getElementById('profile-phone').textContent = AppState.phone;
+            document.getElementById('profile-joined').textContent = AppState.joinedDate;
+            document.getElementById('total-coins').textContent = AppState.coins.toLocaleString();
+            document.getElementById('total-wins').textContent = AppState.totalWins;
+            document.getElementById('total-spins').textContent = AppState.totalSpins;
+            document.getElementById('total-payouts').textContent = AppState.totalPayouts;
+        }
+
+        function renderActivityLog() {
+            const list = document.getElementById('activity-list');
+            list.innerHTML = AppState.lastActivity.map(item => `
+                <div class="activity-item flex items-center space-x-4 p-2 bg-gray-50 rounded-lg">
+                    <div class="text-xl ${item.color}"><i class="fas ${item.icon}"></i></div>
+                    <div class="flex-grow">
+                        <p class="font-medium">${item.text}</p>
+                        <p class="text-xs text-gray-500">${item.time}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderProfileActivity() {
+            const list = document.getElementById('profile-activity-list');
+            list.innerHTML = AppState.lastActivity.map(item => `
+                <div class="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded transition">
+                    <div class="text-lg ${item.color}"><i class="fas ${item.icon}"></i></div>
+                    <div class="flex-grow">
+                        <p class="text-sm font-medium">${item.text}</p>
+                        <p class="text-xs text-gray-500">${item.time}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderPayoutHistory() {
+            const historyContainer = document.getElementById('payout-history');
+            
+            if (AppState.payoutHistory.length === 0) {
+                historyContainer.innerHTML = '<p class="text-gray-500 text-center py-4">No payout requests yet</p>';
+                return;
+            }
+            
+            historyContainer.innerHTML = AppState.payoutHistory.map(payout => {
+                let statusClass, statusText;
+                
+                switch(payout.status) {
+                    case 'pending':
+                        statusClass = 'status-pending';
+                        statusText = 'Pending';
+                        break;
+                    case 'approved':
+                        statusClass = 'status-approved';
+                        statusText = 'Approved';
+                        break;
+                    case 'rejected':
+                        statusClass = 'status-rejected';
+                        statusText = 'Rejected';
+                        break;
+                    default:
+                        statusClass = 'status-pending';
+                        statusText = 'Pending';
+                }
+                
+                return `
+                    <div class="payout-request">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <p class="font-medium">${parseInt(payout.amount).toLocaleString()} coins <span class="text-sm text-gray-500">via ${payout.method || 'N/A'}</span></p>
+                                <p class="text-sm text-gray-500">${payout.formattedTime}</p>
+                            </div>
+                            <span class="payout-status ${statusClass}">${statusText}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function showModal(title, body) {
+            document.getElementById('modal-title').textContent = title;
+            document.getElementById('modal-body').textContent = body;
+            document.getElementById('result-modal').classList.remove('hidden');
+        }
+
+        document.getElementById('modal-close-btn').addEventListener('click', () => {
+            document.getElementById('result-modal').classList.add('hidden');
+        });
+
+        // --- AUTHENTICATION UI ---
+        document.getElementById('show-signup').addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('login-form').classList.add('hidden');
+            document.getElementById('signup-form').classList.remove('hidden');
+        });
+
+        document.getElementById('show-login').addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('signup-form').classList.add('hidden');
+            document.getElementById('login-form').classList.remove('hidden');
+        });
+        
+        const showAuthError = (formElement, message) => {
+            let errorDiv = formElement.querySelector('.auth-error');
+            if (!errorDiv) {
+                errorDiv = document.createElement('div');
+                errorDiv.className = 'auth-error mt-2 p-2 bg-red-100 text-red-700 rounded-lg text-sm';
+                formElement.appendChild(errorDiv);
+            }
+            errorDiv.textContent = message;
+            setTimeout(() => errorDiv.remove(), 4000);
+        };
+
+        document.getElementById('login-btn').addEventListener('click', async () => {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            
+            const result = await Auth.login(email, password);
+            
+            if (result.success) {
+                if (await loadState()) {
+                    document.getElementById('auth-overlay').classList.add('hidden');
+                    init();
+                }
+            } else {
+                showAuthError(document.getElementById('login-form'), result.error || 'Login failed!');
+            }
+        });
+
+        document.getElementById('signup-btn').addEventListener('click', async () => {
+            const name = document.getElementById('signup-name').value;
+            const email = document.getElementById('signup-email').value;
+            const phone = document.getElementById('signup-phone').value;
+            const password = document.getElementById('signup-password').value;
+            
+            const result = await Auth.signup(name, email, phone, password);
+            
+            if (result.success) {
+                if (await loadState()) {
+                    document.getElementById('auth-overlay').classList.add('hidden');
+                    init();
+                }
+            } else {
+                showAuthError(document.getElementById('signup-form'), result.error || 'Signup failed!');
+            }
+        });
+
+        document.getElementById('logout-btn').addEventListener('click', async () => {
+            await Auth.logout();
+            
+            // Show auth overlay
+            document.getElementById('auth-overlay').classList.remove('hidden');
+            
+            // Reset forms
+            document.getElementById('login-form').classList.remove('hidden');
+            document.getElementById('signup-form').classList.add('hidden');
+            document.getElementById('login-email').value = '';
+            document.getElementById('login-password').value = '';
+            document.getElementById('signup-name').value = '';
+            document.getElementById('signup-email').value = '';
+            document.getElementById('signup-phone').value = '';
+            document.getElementById('signup-password').value = '';
+        });
+
+        // --- NAVIGATION ---
+        const pages = document.querySelectorAll('.page');
+        const navItems = document.querySelectorAll('.nav-item');
+        const navLinkBtns = document.querySelectorAll('.nav-link-btn');
+
+        function showPage(pageId) {
+            pages.forEach(page => page.classList.toggle('active', page.id === pageId));
+            navItems.forEach(item => item.classList.toggle('active', item.dataset.page === pageId));
+            if (pageId === 'payout-page') renderPayoutHistory();
+        }
+
+        navItems.forEach(item => {
+            item.addEventListener('click', () => showPage(item.dataset.page));
+        });
+        navLinkBtns.forEach(btn => {
+            btn.addEventListener('click', () => showPage(btn.dataset.page));
+        });
+
+        // --- GAME: SPIN WHEEL ---
+        const wheel = document.getElementById('wheel');
+        const spinBtn = document.getElementById('spin-btn');
+        const segments = [
+            { label: '50', value: 50, color: '#3498db' },
+            { label: '10', value: 10, color: '#2ecc71' },
+            { label: '100', value: 100, color: '#e67e22' },
+            { label: 'Try Again', value: 0, color: '#95a5a6' },
+            { label: '25', value: 25, color: '#f1c40f' },
+            { label: '0', value: 0, color: '#e74c3c' },
+        ];
+        const segmentAngle = 360 / segments.length;
+        let isSpinning = false;
+        let currentRotation = 0;
+
+        function createWheel() {
+            segments.forEach((segment, i) => {
+                const segEl = document.createElement('div');
+                segEl.className = 'segment';
+                segEl.textContent = segment.label;
+                segEl.style.backgroundColor = segment.color;
+                segEl.style.transform = `rotate(${segmentAngle * i}deg) skewY(-${90 - segmentAngle}deg)`;
+                wheel.appendChild(segEl);
+            });
+        }
+
+        spinBtn.addEventListener('click', async () => {
+            if (isSpinning || AppState.spinsLeft <= 0) return;
+
+            isSpinning = true;
+            spinBtn.disabled = true;
+            AppState.spinsLeft--;
+            AppState.totalSpins++;
+            
+            document.getElementById('spin-sound').play().catch(e => console.log("Audio play failed"));
+
+            const randomDegree = Math.floor(Math.random() * (3600 - 2000 + 1)) + 2000;
+            const targetRotation = currentRotation + randomDegree;
+
+            const normalizedRotation = targetRotation % 360;
+            const winningSegmentIndex = Math.floor((360 - normalizedRotation + (segmentAngle/2)) / segmentAngle) % segments.length;
+            const winningSegment = segments[winningSegmentIndex];
+            
+            wheel.style.transform = `rotate(${targetRotation}deg)`;
+            currentRotation = targetRotation;
+
+            setTimeout(async () => {
+                isSpinning = false;
+                spinBtn.disabled = false;
+                
+                const prize = winningSegment.value;
+                
+                if (prize > 0) {
+                    showModal('Congratulations!', `You won ${prize} coins!`);
+                    await updateCoins(prize);
+                    await addActivity('fa-dharmachakra', 'text-blue-500', `Won ${prize} coins from the wheel`);
+                    confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+                } else {
+                    showModal('Better Luck Next Time!', 'You won 0 coins. Try again!');
+                    await updateCoins(0); // This saves the new spin count
+                    await addActivity('fa-dharmachakra', 'text-blue-500', 'Spun the wheel but won nothing');
+                }
+            }, 5000);
+        });
+
+        // --- GAME: SLOT MACHINE ---
+        const spinSlotsBtn = document.getElementById('spin-slots-btn');
+        const reels = [document.getElementById('reel1'), document.getElementById('reel2'), document.getElementById('reel3')];
+        const emojis = ['🍒', '🍋', '🍊', '🍉', '⭐', '🔔', '💎'];
+        let isSlotSpinning = false;
+
+        spinSlotsBtn.addEventListener('click', async () => {
+            if (isSlotSpinning || AppState.slotTokens <= 0) return;
+
+            isSlotSpinning = true;
+            spinSlotsBtn.disabled = true;
+            AppState.slotTokens--;
+            updateUI();
+            
+            document.getElementById('slot-result').textContent = '';
+
+            const spinIntervals = reels.map((reel, i) => {
+                return setInterval(() => {
+                    reel.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+                }, 100);
+            });
+
+            const finalResults = [];
+            reels.forEach((reel, i) => {
+                setTimeout(() => {
+                    clearInterval(spinIntervals[i]);
+                    const finalEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+                    reel.textContent = finalEmoji;
+                    finalResults.push(finalEmoji);
+
+                    if (i === reels.length - 1) {
+                        checkSlotWin(finalResults);
+                    }
+                }, 1000 + i * 500);
+            });
+        });
+
+        async function checkSlotWin(results) {
+            isSlotSpinning = false;
+            spinSlotsBtn.disabled = false;
+            let prize = 0;
+            let message = 'Try Again!';
+
+            if (results[0] === results[1] && results[1] === results[2]) {
+                prize = 100;
+                message = `Jackpot! You won ${prize} coins!`;
+                confetti();
+            } else if (results[0] === results[1] || results[1] === results[2] || results[0] === results[2]) {
+                prize = 50;
+                message = `Nice! Two matches! You won ${prize} coins!`;
+            }
+
+            document.getElementById('slot-result').textContent = message;
+            if (prize > 0) {
+                await updateCoins(prize);
+                await addActivity('fa-dice-three', 'text-green-500', `Won ${prize} coins from slots`);
+            } else {
+                await updateCoins(0); // Saves the token reduction
+                await addActivity('fa-dice-three', 'text-green-500', 'Played slots but won nothing');
+            }
+        }
+
+        // --- GAME: SCRATCH CARD ---
+        const scratchCanvas = document.getElementById('scratch-canvas');
+        const scratchPrizeEl = document.getElementById('scratch-prize');
+        const newCardBtn = document.getElementById('new-scratch-card-btn');
+        const ctx = scratchCanvas.getContext('2d');
+        let isScratching = false;
+        let cardScratched = false;
+
+        function setupScratchCard() {
+            if (AppState.scratchCards <= 0) {
+                scratchPrizeEl.textContent = 'No cards left!';
+                ctx.clearRect(0, 0, scratchCanvas.width, scratchCanvas.height);
+                return;
+            }
+            cardScratched = false;
+            const prize = [10, 25, 50, 100][Math.floor(Math.random() * 4)];
+            scratchPrizeEl.dataset.prize = prize;
+            scratchPrizeEl.textContent = `You won ${prize} coins!`;
+            
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.fillStyle = '#bdc3c7';
+            ctx.fillRect(0, 0, scratchCanvas.width, scratchCanvas.height);
+        }
+
+        function getScratchPos(e) {
+            const rect = scratchCanvas.getBoundingClientRect();
+            const scaleX = scratchCanvas.width / rect.width;
+            const scaleY = scratchCanvas.height / rect.height;
+            const clientX = e.clientX || e.touches[0].clientX;
+            const clientY = e.clientY || e.touches[0].clientY;
+            return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+        }
+
+        function scratch(e) {
+            if (!isScratching || cardScratched) return;
+            e.preventDefault();
+            const pos = getScratchPos(e);
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, 15, 0, 2 * Math.PI);
+            ctx.fill();
+        }
+
+        scratchCanvas.addEventListener('mousedown', (e) => { isScratching = true; scratch(e); });
+        scratchCanvas.addEventListener('touchstart', (e) => { isScratching = true; scratch(e); });
+        scratchCanvas.addEventListener('mousemove', scratch);
+        scratchCanvas.addEventListener('touchmove', scratch);
+        document.addEventListener('mouseup', () => { if(isScratching) checkScratchComplete(); isScratching = false; });
+        document.addEventListener('touchend', () => { if(isScratching) checkScratchComplete(); isScratching = false; });
+
+        async function checkScratchComplete() {
+            if (cardScratched) return;
+            const pixels = ctx.getImageData(0, 0, scratchCanvas.width, scratchCanvas.height).data;
+            let transparent = 0;
+            for (let i = 3; i < pixels.length; i += 4) {
+                if (pixels[i] === 0) transparent++;
+            }
+            if (transparent / (pixels.length / 4) > 0.7) {
+                cardScratched = true;
+                ctx.clearRect(0, 0, scratchCanvas.width, scratchCanvas.height);
+                const prize = parseInt(scratchPrizeEl.dataset.prize);
+                AppState.scratchCards--;
+                await updateCoins(prize);
+                await addActivity('fa-star', 'text-purple-500', `Won ${prize} coins from a scratch card`);
+                confetti({ particleCount: 50, spread: 50, origin: { y: 0.6 } });
+            }
+        }
+
+        newCardBtn.addEventListener('click', setupScratchCard);
+
+        // --- GAME: TAP & WIN ---
+        const startTapBtn = document.getElementById('start-tap-game-btn');
+        const tapBtn = document.getElementById('tap-btn');
+        const tapTimerEl = document.getElementById('tap-timer');
+        const tapResultEl = document.getElementById('tap-result');
+        let tapCount, tapTimer, timeLeft;
+
+        startTapBtn.addEventListener('click', () => {
+            startTapBtn.style.display = 'none';
+            tapBtn.style.display = 'flex';
+            tapBtn.disabled = false;
+            tapResultEl.textContent = '';
+            tapCount = 0;
+            timeLeft = 5;
+            tapTimerEl.textContent = timeLeft.toFixed(1);
+
+            tapTimer = setInterval(() => {
+                timeLeft -= 0.1;
+                tapTimerEl.textContent = timeLeft.toFixed(1);
+                if (timeLeft <= 0) {
+                    clearInterval(tapTimer);
+                    endTapGame();
+                }
+            }, 100);
+        });
+
+        tapBtn.addEventListener('click', () => {
+            if (timeLeft > 0) {
+                tapCount++;
+            }
+        });
+
+        async function endTapGame() {
+            tapTimerEl.textContent = '0.0';
+            tapBtn.disabled = true;
+            tapBtn.style.display = 'none';
+            startTapBtn.style.display = 'block';
+            const coinsWon = tapCount;
+            tapResultEl.textContent = `You tapped ${tapCount} times and won ${coinsWon} coins!`;
+            await updateCoins(coinsWon);
+            await addActivity('fa-hand-pointer', 'text-indigo-500', `Won ${coinsWon} coins from Tap & Win`);
+        }
+
+        // --- PAYOUT PAGE ---
+        const copyBtn = document.getElementById('copy-referral-btn');
+        const referralCodeEl = document.getElementById('referral-code');
+        const requestPayoutBtn = document.getElementById('request-payout-btn');
+        const payoutModal = document.getElementById('payout-modal');
+        const payoutMethodSelect = document.getElementById('payout-method');
+        const payoutDetailForms = document.querySelectorAll('.payout-details-form');
+        const cancelPayoutBtn = document.getElementById('cancel-payout-btn');
+        const submitPayoutBtn = document.getElementById('submit-payout-btn');
+        const payoutErrorEl = document.getElementById('payout-error');
+        const payoutAmountInput = document.getElementById('payout-amount');
+        const payoutModalBalance = document.getElementById('payout-modal-balance');
+
+        copyBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(referralCodeEl.value).then(() => {
+                copyBtn.textContent = 'Copied!';
+                setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
+            });
+        });
+        
+        requestPayoutBtn.addEventListener('click', () => {
+            if (AppState.coins >= 1000) {
+                payoutErrorEl.textContent = '';
+                payoutAmountInput.value = '';
+                payoutAmountInput.max = AppState.coins;
+                payoutModalBalance.textContent = AppState.coins.toLocaleString();
+                payoutModal.classList.remove('hidden');
+            }
+        });
+        
+        cancelPayoutBtn.addEventListener('click', () => payoutModal.classList.add('hidden'));
+
+        payoutMethodSelect.addEventListener('change', (e) => {
+            payoutDetailForms.forEach(form => form.classList.add('hidden'));
+            document.getElementById(`payout-details-${e.target.value}`).classList.remove('hidden');
+        });
+
+        submitPayoutBtn.addEventListener('click', async () => {
+            payoutErrorEl.textContent = '';
+            const requestedAmount = parseInt(payoutAmountInput.value, 10);
+            const method = payoutMethodSelect.value;
+            let details = {}, isValid = true;
+
+            // --- VALIDATION ---
+            if (isNaN(requestedAmount)) {
+                payoutErrorEl.textContent = 'Please enter a valid amount.';
+                return;
+            }
+            if (requestedAmount < 1000) {
+                payoutErrorEl.textContent = 'Minimum payout amount is 1,000 coins.';
+                return;
+            }
+            if (requestedAmount > AppState.coins) {
+                payoutErrorEl.textContent = 'You cannot withdraw more than your balance.';
+                return;
+            }
+            
+            if (method === 'upi') {
+                details.upiId = document.getElementById('upi-id').value.trim();
+                if (!details.upiId) isValid = false;
+            } else if (method === 'phonepe') {
+                details.phonepeNumber = document.getElementById('phonepe-number').value.trim();
+                if (!details.phonepeNumber) isValid = false;
+            } else if (method === 'bank') {
+                details.accountName = document.getElementById('bank-account-name').value.trim();
+                details.accountNumber = document.getElementById('bank-account-number').value.trim();
+                details.ifsc = document.getElementById('bank-ifsc').value.trim();
+                if (!details.accountName || !details.accountNumber || !details.ifsc) isValid = false;
+            }
+
+            if (!isValid) {
+                payoutErrorEl.textContent = 'Please fill in all required payment details.';
+                return;
+            }
+
+            submitPayoutBtn.disabled = true;
+            submitPayoutBtn.textContent = 'Submitting...';
+            
+            const result = await Auth.apiCall('request_payout', {
+                amount: requestedAmount,
+                method: method.charAt(0).toUpperCase() + method.slice(1),
+                details
+            });
+
+            if(result.success) {
+                AppState.coins -= requestedAmount; // Subtract from local state
+                AppState.totalPayouts++;
+                updateUI();
+                await addActivity('fa-money-bill-wave', 'text-green-500', `Requested payout of ${requestedAmount.toLocaleString()} coins`);
+                await loadState(); // Reload all data from server to be sure
+                payoutModal.classList.add('hidden');
+                showModal('Payout Requested', 'Your request has been received and will be processed soon.');
+            } else {
+                 payoutErrorEl.textContent = result.error || 'An error occurred. Please try again.';
+            }
+
+            submitPayoutBtn.disabled = false;
+            submitPayoutBtn.textContent = 'Submit Request';
+        });
+
+        // --- INITIALIZATION ---
+        function init() {
+            createWheel();
+            setupScratchCard();
+            tapBtn.style.display = 'none';
+            showPage('dashboard-page');
+        }
+
+        // Check authentication on load
+        async function startApp() {
+            const session = await Auth.checkSession();
+            if (session.isLoggedIn) {
+                if (await loadState()) {
+                    document.getElementById('auth-overlay').classList.add('hidden');
+                    init();
+                }
+            } else {
+                document.getElementById('auth-overlay').classList.remove('hidden');
+            }
+        }
+        
+        startApp();
+    });
+    </script>
+</body>
+</html>
